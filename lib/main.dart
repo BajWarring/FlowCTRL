@@ -1,7 +1,7 @@
+import 'dart:async'; // Import added for Timer
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_accessibility_service/flutter_accessibility_service.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const FlowCTRLApp());
@@ -30,48 +30,44 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> {
   bool _isServiceEnabled = false;
   bool _blockerActive = true;
+  Timer? _permissionCheckTimer;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _checkPermissions();
     _loadState();
+    // Start checking for permission every 1 second
+    _permissionCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _checkPermissions();
+    });
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    _permissionCheckTimer?.cancel();
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Re-check permissions when user comes back to app
-    if (state == AppLifecycleState.resumed) {
-      _checkPermissions();
-    }
-  }
-
   Future<void> _checkPermissions() async {
-    // Check if Accessibility Service is running
     bool isRunning = await FlutterAccessibilityService.isAccessibilityPermissionEnabled();
-    setState(() {
-      _isServiceEnabled = isRunning;
-    });
-
-    if (!isRunning) {
-      _showPermissionDialog();
+    
+    // Only update UI if state changed to avoid flickering
+    if (isRunning != _isServiceEnabled) {
+      setState(() {
+        _isServiceEnabled = isRunning;
+      });
+      
+      // If permission is granted and dialog is likely open, this rebuild will close it
+      // purely by virtue of the UI conditional below switching to the main content.
     }
   }
 
   Future<void> _loadState() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      // Key must match the one used in Kotlin (flutter.isBlockingEnabled)
       _blockerActive = prefs.getBool('isBlockingEnabled') ?? true;
     });
   }
@@ -82,34 +78,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() {
       _blockerActive = value;
     });
-    // Note: The native service reads this SharedPref value
-  }
-
-  void _showPermissionDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text("Permission Required"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("FlowCTRL needs Accessibility Service to detect and block Shorts."),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(Icons.accessibility_new, color: Colors.red),
-              title: const Text("Accessibility Service"),
-              subtitle: const Text("Tap to enable in Settings"),
-              onTap: () async {
-                // Open Accessibility Settings
-                await FlutterAccessibilityService.requestAccessibilityPermission();
-                if (context.mounted) Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
@@ -121,38 +89,77 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
       body: Center(
         child: _isServiceEnabled
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _blockerActive ? Icons.shield : Icons.shield_outlined,
-                    size: 100,
-                    color: _blockerActive ? Colors.green : Colors.grey,
-                  ),
-                  const SizedBox(height: 30),
-                  Text(
-                    _blockerActive ? "Blocker Active" : "Blocker Paused",
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
-                  Switch(
-                    value: _blockerActive,
-                    onChanged: _toggleBlocker,
-                    activeColor: Colors.green,
-                  ),
-                  const SizedBox(height: 50),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 40),
-                    child: Text(
-                      "Open YouTube to test. If a Short appears, FlowCTRL will automatically navigate back.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                ],
-              )
-            : const CircularProgressIndicator(),
+            ? _buildControlPanel()
+            : _buildPermissionRequest(),
       ),
+    );
+  }
+
+  Widget _buildControlPanel() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          _blockerActive ? Icons.shield : Icons.shield_outlined,
+          size: 100,
+          color: _blockerActive ? Colors.green : Colors.grey,
+        ),
+        const SizedBox(height: 30),
+        Text(
+          _blockerActive ? "Blocker Active" : "Blocker Paused",
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 20),
+        Switch(
+          value: _blockerActive,
+          onChanged: _toggleBlocker,
+          activeColor: Colors.green,
+        ),
+        const SizedBox(height: 50),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 40),
+          child: Text(
+            "Service is Running.\nOpen YouTube Shorts to test.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey),
+          ),
+        )
+      ],
+    );
+  }
+
+  Widget _buildPermissionRequest() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.accessibility_new, size: 80, color: Colors.orange),
+        const SizedBox(height: 20),
+        const Text(
+          "Permission Required",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        const Padding(
+          padding: EdgeInsets.all(20.0),
+          child: Text(
+            "FlowCTRL needs Accessibility Service to detect and block Shorts content.",
+            textAlign: TextAlign.center,
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            await FlutterAccessibilityService.requestAccessibilityPermission();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.deepPurple,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text("Open Settings to Enable"),
+        ),
+        const SizedBox(height: 20),
+        const CircularProgressIndicator(),
+        const SizedBox(height: 10),
+        const Text("Waiting for permission...", style: TextStyle(fontSize: 12)),
+      ],
     );
   }
 }
