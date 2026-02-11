@@ -6,81 +6,64 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.content.SharedPreferences
 import android.content.Context
 import android.graphics.Rect
-import android.util.DisplayMetrics
 
 class FlowAccessibilityService : AccessibilityService() {
 
     private var isBlockingEnabled = true
-    private var screenHeight = 0
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         val prefs: SharedPreferences = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         isBlockingEnabled = prefs.getBoolean("flutter.isBlockingEnabled", true)
-        
-        // Get Screen Height to detect Navigation Bar
-        val metrics = resources.displayMetrics
-        screenHeight = metrics.heightPixels
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Reload pref on every event to ensure instant toggle (optional but safer)
         val prefs: SharedPreferences = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         isBlockingEnabled = prefs.getBoolean("flutter.isBlockingEnabled", true)
 
         if (!isBlockingEnabled || event == null) return
 
         if (event.packageName?.toString() == "com.google.android.youtube") {
+            // We use the root node to find specific Shorts PLAYER elements
             val rootNode = rootInActiveWindow ?: return
-            checkForShorts(rootNode)
-        }
-    }
-
-    private fun checkForShorts(node: AccessibilityNodeInfo) {
-        if (node.text != null && node.text.toString().equals("Shorts", ignoreCase = true)) {
-            if (shouldBlockNode(node)) {
+            
+            if (isShortsPlayer(rootNode)) {
                 performGlobalAction(GLOBAL_ACTION_BACK)
-                return
-            }
-        }
-
-        if (node.contentDescription != null && node.contentDescription.toString().contains("Shorts", ignoreCase = true)) {
-             if (shouldBlockNode(node)) {
-                performGlobalAction(GLOBAL_ACTION_BACK)
-                return
-            }
-        }
-        
-        // Recursive check
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i)
-            if (child != null) {
-                checkForShorts(child)
-                child.recycle()
             }
         }
     }
 
-    private fun shouldBlockNode(node: AccessibilityNodeInfo): Boolean {
-        val rect = Rect()
-        node.getBoundsInScreen(rect)
-
-        // LOGIC: The Navigation Bar is always at the bottom.
-        // If the "Shorts" text is in the bottom 15% of the screen, it is the Nav Button.
-        // We DO NOT want to block the Nav Button (that crashes the app).
-        // We only want to block the "Shorts" header or player content which is usually at the top or middle.
+    private fun isShortsPlayer(root: AccessibilityNodeInfo): Boolean {
+        // STRATEGY 1: Look for specific View IDs used only in the Shorts Player
+        // YouTube uses 'reel' in their ID names for Shorts (e.g., reel_recycler, reel_player)
+        // This usually does NOT appear on the Home Screen shelf.
         
-        val bottomThreshold = screenHeight * 0.85 // 85% down the screen
-        
-        if (rect.top > bottomThreshold) {
-            // This is likely the bottom navigation bar -> IGNORE IT
-            return false
+        val reelNode = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_recycler")
+        if (reelNode != null && reelNode.isNotEmpty()) {
+            return true
         }
+
+        val reelTouch = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_touch_helper_0")
+        if (reelTouch != null && reelTouch.isNotEmpty()) {
+            return true
+        }
+
+        // STRATEGY 2: Fallback - Strict Text Check
+        // Only block if we see "Shorts" AND "Like" button implies we are in a player, not a shelf.
+        // The Home screen shelf has "Shorts" but usually no visible "Like" button for the shelf itself.
         
-        // If it's not at the bottom, it's the player or the shelf -> BLOCK IT
-        return true
+        val hasShortsText = !root.findAccessibilityNodeInfosByText("Shorts").isNullOrEmpty()
+        val hasLikeButton = !root.findAccessibilityNodeInfosByText("Like this video").isNullOrEmpty() 
+                            || !root.findAccessibilityNodeInfosByContentDescription("Like this video").isNullOrEmpty()
+
+        if (hasShortsText && hasLikeButton) {
+            return true
+        }
+
+        return false
     }
 
     override fun onInterrupt() {
+        // Required method
     }
 }
