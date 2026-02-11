@@ -20,25 +20,24 @@ jobs:
 
       - name: Create Flutter App
         run: |
-          # Create app with specific package (com.sage.flowctrl)
-          # Note: Project name in dart cannot have dots, so we use 'sage_tools' internally
-          flutter create --org com.sage --project-name sage_tools .
+          # Dart project name must be snake_case
+          flutter create --org com.sage --project-name flowctrl .
           
-          # Remove the default test file to avoid build errors in empty setup
+          # Remove default test file
           rm -rf test/widget_test.dart
 
-      - name: Configure App Name (Sage Tools)
+      - name: Configure App Name (FlowCTRL)
         run: |
-          # Use sed to replace the label in AndroidManifest to "Sage Tools"
-          sed -i 's/android:label="sage_tools"/android:label="Sage Tools"/g' android/app/src/main/AndroidManifest.xml
+          # Set Android app label
+          sed -i 's/android:label="flowctrl"/android:label="FlowCTRL"/g' android/app/src/main/AndroidManifest.xml
           
-          # Update the description in pubspec.yaml
-          sed -i 's/description: A new Flutter project./description: Sage Tools - Personal Accounting/g' pubspec.yaml
+          # Update pubspec description
+          sed -i 's/description: A new Flutter project./description: FlowCTRL - Short Form Content Blocker/g' pubspec.yaml
 
       - name: Commit and Push Changes
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
           git add .
-          git commit -m "Initialize Sage Tools (com.sage.tools)"
+          git commit -m "Initialize FlowCTRL (com.sage.flowctrl)"
           git push
