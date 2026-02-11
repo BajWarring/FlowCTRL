@@ -1,0 +1,43 @@
+name: 2. Build APK
+on:
+  workflow_dispatch: # Manual trigger only
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      # Updated Cache Key for 3.38.0
+      - name: Cache Flutter SDK
+        id: cache-flutter
+        uses: actions/cache@v4
+        with:
+          path: /opt/hostedtoolcache/flutter
+          key: flutter-3.38.0-ubuntu-latest
+
+      # Updated Flutter Version to 3.38.0 (Supports Material 3 containers)
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+         flutter-version: '3.38.0'
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlowCTRL_
+          path: build/app/outputs/flutter-apk/app-release.apk
