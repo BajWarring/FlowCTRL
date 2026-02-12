@@ -15,10 +15,8 @@ class FlowAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        // Tell UI we are alive
         val prefs: SharedPreferences = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         prefs.edit().putBoolean("flutter.service_active", true).apply()
-        
         isBlockingEnabled = prefs.getBoolean("flutter.isBlockingEnabled", true)
     }
 
@@ -29,6 +27,12 @@ class FlowAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // --- THE FIX ---
+        // We must reload the settings BEFORE we decide to return/stop.
+        // Previously, this was below the check, so once it was false, it never checked again.
+        val prefs: SharedPreferences = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        isBlockingEnabled = prefs.getBoolean("flutter.isBlockingEnabled", true)
+
         // 1. Basic Checks
         if (!isBlockingEnabled || event == null) return
         if (event.packageName?.toString() != "com.google.android.youtube") return
@@ -38,14 +42,9 @@ class FlowAccessibilityService : AccessibilityService() {
             return
         }
 
-        // 3. Sync Settings
-        val prefs: SharedPreferences = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        isBlockingEnabled = prefs.getBoolean("flutter.isBlockingEnabled", true)
-
         if (isBlockingEnabled) {
             val rootNode = rootInActiveWindow ?: return
             
-            // Double check we are still in YouTube
             if (rootNode.packageName?.toString() == "com.google.android.youtube") {
                  if (isShortsPlayer(rootNode)) {
                     performGlobalAction(GLOBAL_ACTION_BACK)
@@ -56,8 +55,7 @@ class FlowAccessibilityService : AccessibilityService() {
     }
 
     private fun isShortsPlayer(root: AccessibilityNodeInfo): Boolean {
-        // STRATEGY 1: Internal View IDs (Fastest & Most Accurate)
-        // These IDs are specific to the Shorts Player UI
+        // STRATEGY 1: Internal View IDs
         val reelRecycler = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_recycler")
         if (reelRecycler != null && !reelRecycler.isEmpty()) return true
 
@@ -67,18 +65,11 @@ class FlowAccessibilityService : AccessibilityService() {
         val reelPlayer = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_player_view")
         if (reelPlayer != null && !reelPlayer.isEmpty()) return true
 
-        // STRATEGY 2: Contextual Text Check (The "Nuclear" Option)
-        // If we can't find the IDs, we look for the "Shorts" text.
-        // BUT, to avoid closing the Home Screen, we ONLY block if we ALSO see engagement buttons.
-        
+        // STRATEGY 2: Contextual Text Check
         val shortsTextNodes = root.findAccessibilityNodeInfosByText("Shorts")
         val hasShortsText = shortsTextNodes != null && !shortsTextNodes.isEmpty()
 
         if (hasShortsText) {
-            // We found "Shorts". Now, is this a player?
-            // A player ALWAYS has "Like", "Dislike", or "Comment" buttons visible.
-            // The Home Screen shelf usually does not have these text labels exposed in the same way.
-
             val likeNodes = root.findAccessibilityNodeInfosByText("Like")
             val commentNodes = root.findAccessibilityNodeInfosByText("Comment")
             val dislikeNodes = root.findAccessibilityNodeInfosByText("Dislike")
@@ -90,11 +81,9 @@ class FlowAccessibilityService : AccessibilityService() {
                                 (subscribeNodes != null && !subscribeNodes.isEmpty())
 
             if (hasEngagement) {
-                // High probability this is the Shorts Player
                 return true
             }
         }
-
         return false
     }
 
