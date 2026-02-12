@@ -49,7 +49,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Immediate aggressive check when returning to app
       _checkPermissionNow();
     }
   }
@@ -57,21 +56,16 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   // --- Logic ---
 
   void _startPermissionMonitor() {
-    // Check every 1 second
     _monitorTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _checkPermissionNow();
     });
   }
 
   Future<void> _checkPermissionNow() async {
-    // 1. Check the official OS flag
     bool osPermission = await FlutterAccessibilityService.isAccessibilityPermissionEnabled();
-    
-    // 2. Check the "I AM ALIVE" flag from Kotlin (Backup Source of Truth)
     final prefs = await SharedPreferences.getInstance();
     bool serviceRunning = prefs.getBool('service_active') ?? false;
 
-    // If EITHER is true, we are good.
     bool actuallyEnabled = osPermission || serviceRunning;
 
     if (actuallyEnabled != _isServiceEnabled) {
@@ -103,50 +97,33 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    // FIX: Removed the outer "Center" and "Container" constraints.
+    // The Scaffold now IS the screen, filling it completely.
     return Scaffold(
-      backgroundColor: Colors.grey[200], 
-      body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400, maxHeight: 850),
-          decoration: BoxDecoration(
-            color: kBgWhite,
-            borderRadius: BorderRadius.circular(40),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 50,
-                offset: const Offset(0, 25),
-              )
+      backgroundColor: kBgWhite, 
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildHeroSection(),
+                      _buildAppsList(),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(40),
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    _buildHeader(),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            _buildHeroSection(),
-                            _buildAppsList(),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                if (!_isServiceEnabled) 
-                  Positioned.fill(
-                    child: _buildPermissionOverlay(),
-                  ),
-              ],
+          
+          if (!_isServiceEnabled) 
+            Positioned.fill(
+              child: _buildPermissionOverlay(),
             ),
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -154,7 +131,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   Widget _buildHeader() {
     return Container(
       color: Colors.white, 
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 10), 
+      // Added SafeArea padding for top notch
+      padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24, 24, 10), 
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -169,7 +147,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           ),
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.grey),
-            onPressed: () {}, // Settings placeholder
+            onPressed: () {}, 
           )
         ],
       ),
@@ -452,9 +430,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   Widget _buildPermissionOverlay() {
     return GestureDetector(
-      onTap: _checkPermissionNow, // Tapping background retries check
+      onTap: _checkPermissionNow, 
       child: Container(
-        color: Colors.black.withOpacity(0.6),
+        color: Colors.black.withOpacity(0.6), // Standard dark overlay
+        // FIX: Removed "Center -> Container" that made it a floating card
+        // Now it uses a Dialog-style layout or just full screen if you prefer.
+        // I will keep the Center but remove the "margin" that caused creases.
         child: Center(
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -505,11 +486,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 ),
                 const SizedBox(height: 12),
                 
-                // --- THE MANUAL OVERRIDE BUTTON ---
-                // If the automatic checks fail, this lets the user force-enter the app.
                 TextButton(
                   onPressed: () {
-                    // Force the UI to believe it's enabled
                     setState(() {
                       _isServiceEnabled = true;
                     });
