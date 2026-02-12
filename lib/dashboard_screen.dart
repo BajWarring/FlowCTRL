@@ -293,3 +293,232 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                           color: _isBlockingEnabled ? kIndigo : kGray400,
                           letterSpacing: 1,
                         ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _isBlockingEnabled ? "Blocking Active" : "Tap to turn ON",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: _isBlockingEnabled ? kIndigoLight : kGray400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppsList() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "MANAGED APPS",
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: kGray400,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade100),
+              boxShadow: const [
+                 BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0,2))
+              ]
+            ),
+            child: Column(
+              children: [
+                _buildAppItem(
+                  icon: Icons.play_arrow_rounded,
+                  iconColor: Colors.red,
+                  bgIconColor: Colors.red.shade50,
+                  name: "YouTube",
+                  desc: "Block shorts",
+                  isOn: _isBlockingEnabled,
+                  onToggle: (val) => _toggleBlocking(val),
+                ),
+                Container(height: 1, color: Colors.grey.shade50),
+                _buildAppItem(
+                  icon: Icons.camera_alt_outlined,
+                  iconColor: Colors.pink,
+                  bgIconColor: Colors.pink.shade50,
+                  name: "Instagram",
+                  desc: "Block reels",
+                  isOn: false,
+                  onToggle: (val) {}, 
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppItem({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgIconColor,
+    required String name,
+    required String desc,
+    required bool isOn,
+    required Function(bool) onToggle,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: bgIconColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: iconColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: kGray900,
+                  ),
+                ),
+                Text(
+                  desc,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () => onToggle(!isOn),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 50,
+              height: 28,
+              decoration: BoxDecoration(
+                color: isOn ? kIndigo : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutBack,
+                    left: isOn ? 24 : 2,
+                    top: 2,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                           BoxShadow(color: Colors.black12, blurRadius: 2)
+                        ]
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionOverlay() {
+    return GestureDetector(
+      // Tapping the background forces a re-check (good UX fix)
+      onTap: _checkPermissionNow,
+      child: Container(
+        color: Colors.black.withOpacity(0.6),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.touch_app_rounded, size: 60, color: Color(0xFF4F46E5)),
+                const SizedBox(height: 20),
+                Text(
+                  "Permission Required",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: kGray900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  "FlowCTRL needs Accessibility Service to detect when Shorts are playing.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey, fontSize: 15),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await FlutterAccessibilityService.requestAccessibilityPermission();
+                      // Check immediately after they return or tap
+                      await Future.delayed(const Duration(seconds: 1));
+                      _checkPermissionNow();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kIndigo,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      "Enable in Settings",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Fallback manual button if timer is slow
+                TextButton(
+                  onPressed: _checkPermissionNow,
+                  child: const Text("I have enabled it", style: TextStyle(color: Colors.grey)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
