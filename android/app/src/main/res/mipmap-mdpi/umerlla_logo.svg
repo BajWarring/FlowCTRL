@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<svg
+
+  width="512"
+
+  height="512"
+
+  viewBox="0 0 512 512"
+
+  fill="none"
+
+  xmlns="http://www.w3.org/2000/svg"
+
+>
+
+  <!-- Background Squircle -->
+
+  <rect width="512" height="512" rx="120" fill="#4F46E5"/>
+
+
+  <!-- Rain / Feed Lines -->
+
+  <path d="M156 100V150" stroke="white" stroke-opacity="0.3" stroke-width="25" stroke-linecap="round"/>
+
+  <path d="M256 80V130"  stroke="white" stroke-opacity="0.3" stroke-width="25" stroke-linecap="round"/>
+
+  <path d="M356 100V150" stroke="white" stroke-opacity="0.3" stroke-width="25" stroke-linecap="round"/>
+
+  <!-- Inverted Umbrella -->
+
+  <path
+
+    d="M120 280C120 200 256 160 256 160C256 160 392 200 392 280"
+
+    stroke="white"
+
+    stroke-width="35"
+
+    stroke-linecap="round"
+
+    stroke-linejoin="round"
+
+    fill="none"
+
+  />
+
+  <!-- Handle -->
+
+  <path
+
+    d="M256 280V360C256 380 270 390 280 390"
+
+    stroke="white"
+
+    stroke-width="35"
+
+    stroke-linecap="round"
+
+  />
+
+</svg>
