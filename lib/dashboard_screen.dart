@@ -13,8 +13,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   // --- State Variables ---
-  bool _isServiceEnabled = false; // Is the Android Permission given?
-  bool _isBlockingEnabled = true; // Is the "Blocker" turned ON?
+  bool _isServiceEnabled = false; 
+  bool _isBlockingEnabled = true; 
   Timer? _monitorTimer;
   late AnimationController _spinController;
 
@@ -28,7 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // Detect App Resume
+    WidgetsBinding.instance.addObserver(this); 
     _spinController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -46,10 +46,10 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     super.dispose();
   }
 
-  // Detect when user comes back from Settings
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // Immediate aggressive check when returning to app
       _checkPermissionNow();
     }
   }
@@ -57,18 +57,27 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   // --- Logic ---
 
   void _startPermissionMonitor() {
-    // Check frequently (every 500ms) to ensure popup disappears instantly
-    _monitorTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+    // Check every 1 second
+    _monitorTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _checkPermissionNow();
     });
   }
 
   Future<void> _checkPermissionNow() async {
-    bool isRunning = await FlutterAccessibilityService.isAccessibilityPermissionEnabled();
-    if (isRunning != _isServiceEnabled) {
+    // 1. Check the official OS flag
+    bool osPermission = await FlutterAccessibilityService.isAccessibilityPermissionEnabled();
+    
+    // 2. Check the "I AM ALIVE" flag from Kotlin (Backup Source of Truth)
+    final prefs = await SharedPreferences.getInstance();
+    bool serviceRunning = prefs.getBool('service_active') ?? false;
+
+    // If EITHER is true, we are good.
+    bool actuallyEnabled = osPermission || serviceRunning;
+
+    if (actuallyEnabled != _isServiceEnabled) {
       if (mounted) {
         setState(() {
-          _isServiceEnabled = isRunning;
+          _isServiceEnabled = actuallyEnabled;
         });
       }
     }
@@ -79,7 +88,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     setState(() {
       _isBlockingEnabled = prefs.getBool('isBlockingEnabled') ?? true;
     });
-    // Check permission immediately on load
     _checkPermissionNow();
   }
 
@@ -96,10 +104,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200], // Outer background
+      backgroundColor: Colors.grey[200], 
       body: Center(
         child: Container(
-          // The "Mobile Simulation" Container
           constraints: const BoxConstraints(maxWidth: 400, maxHeight: 850),
           decoration: BoxDecoration(
             color: kBgWhite,
@@ -132,7 +139,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   ],
                 ),
                 
-                // Overlay Logic: Only show if service is NOT enabled
                 if (!_isServiceEnabled) 
                   Positioned.fill(
                     child: _buildPermissionOverlay(),
@@ -147,8 +153,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   Widget _buildHeader() {
     return Container(
-      color: Colors.white, // Match hero section color to hide gaps
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 10), // Reduced top padding
+      color: Colors.white, 
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 10), 
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -163,9 +169,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           ),
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.grey),
-            onPressed: () {
-               // Settings placeholder
-            },
+            onPressed: () {}, // Settings placeholder
           )
         ],
       ),
@@ -175,7 +179,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   Widget _buildHeroSection() {
     return Container(
       width: double.infinity,
-      // Increased bottom padding to ensure button sits completely inside
       padding: const EdgeInsets.only(top: 20, bottom: 60), 
       decoration: BoxDecoration(
         color: Colors.white,
@@ -216,7 +219,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // 1. The Glow (Only when active)
                 if (_isBlockingEnabled)
                   Container(
                     width: 180,
@@ -233,7 +235,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     ),
                   ),
 
-                // 2. The Rotating Light Loop
                 if (_isBlockingEnabled)
                   AnimatedBuilder(
                     animation: _spinController,
@@ -260,7 +261,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     },
                   ),
 
-                // 3. The Inner White Button
                 Container(
                   width: 172,
                   height: 172,
@@ -273,12 +273,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
-                      // Inner white highlight
-                       BoxShadow(
+                       const BoxShadow(
                         color: Colors.white,
                         blurRadius: 0,
                         spreadRadius: 2,
-                        offset: const Offset(0, 0),
+                        offset: Offset(0, 0),
                       ),
                     ],
                   ),
@@ -453,8 +452,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   Widget _buildPermissionOverlay() {
     return GestureDetector(
-      // Tapping the background forces a re-check (good UX fix)
-      onTap: _checkPermissionNow,
+      onTap: _checkPermissionNow, // Tapping background retries check
       child: Container(
         color: Colors.black.withOpacity(0.6),
         child: Center(
@@ -490,9 +488,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   child: ElevatedButton(
                     onPressed: () async {
                       await FlutterAccessibilityService.requestAccessibilityPermission();
-                      // Check immediately after they return or tap
-                      await Future.delayed(const Duration(seconds: 1));
-                      _checkPermissionNow();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: kIndigo,
@@ -509,10 +504,17 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Fallback manual button if timer is slow
+                
+                // --- THE MANUAL OVERRIDE BUTTON ---
+                // If the automatic checks fail, this lets the user force-enter the app.
                 TextButton(
-                  onPressed: _checkPermissionNow,
-                  child: const Text("I have enabled it", style: TextStyle(color: Colors.grey)),
+                  onPressed: () {
+                    // Force the UI to believe it's enabled
+                    setState(() {
+                      _isServiceEnabled = true;
+                    });
+                  },
+                  child: const Text("I have enabled it (Skip Check)", style: TextStyle(color: Colors.grey)),
                 ),
               ],
             ),
