@@ -23,6 +23,8 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   final Color kSlate800 = const Color(0xFF1E293B);
   final Color kIndigo600 = const Color(0xFF4F46E5);
   final Color kGray50 = const Color(0xFFF9FAFB);
+  // FIX: Added custom Emerald color since Colors.emerald doesn't exist
+  final Color kEmerald500 = const Color(0xFF10B981); 
 
   // --- Logic ---
   static const platform = MethodChannel('com.sage.flowctrl/settings');
@@ -36,7 +38,6 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    // Animation setup for the "Push" transition
     _navController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -46,7 +47,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
     _mainScreenOffset = Tween<Offset>(begin: Offset.zero, end: const Offset(-0.25, 0))
         .animate(CurvedAnimation(parent: _navController, curve: Curves.easeOutCubic));
     
-    _mainScreenScale = Tween<double>(begin: 1.0, end: 0.95) // Slight scale down effect
+    _mainScreenScale = Tween<double>(begin: 1.0, end: 0.95)
         .animate(CurvedAnimation(parent: _navController, curve: Curves.easeOutCubic));
 
     _detailScreenOffset = Tween<Offset>(begin: const Offset(1.0, 0), end: Offset.zero)
@@ -98,12 +99,11 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
           SlideTransition(
             position: _mainScreenOffset,
             child: ScaleTransition(
-              scale: _mainScreenScale, // Optional subtle depth effect
+              scale: _mainScreenScale,
               child: AnimatedBuilder(
                 animation: _navController,
                 builder: (context, child) {
                   return ColorFiltered(
-                    // Dim the background when detail opens
                     colorFilter: ColorFilter.mode(
                       Colors.black.withOpacity(_navController.value * 0.5),
                       BlendMode.darken,
@@ -125,8 +125,6 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
       ),
     );
   }
-
-  // --- BUILDERS ---
 
   Widget _buildMainContent(bool isDark, Color cardColor, Color textColor, Color borderColor) {
     return Scaffold(
@@ -188,7 +186,8 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
                 Divider(height: 1, color: borderColor),
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  leading: _buildIconBox(Icons.apps_outlined, Colors.emerald, isDark),
+                  // FIX: Used custom kEmerald500 here
+                  leading: _buildIconBox(Icons.apps_outlined, kEmerald500, isDark),
                   title: Text("Blocked Apps", style: TextStyle(fontWeight: FontWeight.w500, color: textColor)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -219,7 +218,7 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
 
   Widget _buildDetailContent(bool isDark, Color cardColor, Color textColor, Color borderColor) {
     return Scaffold(
-      backgroundColor: cardColor, // Detail page is usually fuller background
+      backgroundColor: cardColor,
       appBar: AppBar(
         title: Text("Quick Settings Tile", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
         backgroundColor: cardColor.withOpacity(0.9),
@@ -232,7 +231,6 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          // Toggle Card
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -262,22 +260,18 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
 
           const SizedBox(height: 32),
 
-          // THE ILLUSTRATION (Custom Painter to match SVG)
           Center(
             child: SizedBox(
               width: 340,
               height: 460,
               child: Stack(
                 children: [
-                  // The actual illustration drawn with code
                   CustomPaint(
                     size: const Size(340, 460),
                     painter: OneUIPainter(isDark: isDark, indigo: kIndigo600),
                   ),
-                  
-                  // "Added!" Badge
                   Positioned(
-                    top: 180, // Approximate position from SVG
+                    top: 180,
                     right: 80,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -296,7 +290,6 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
 
           const SizedBox(height: 24),
 
-          // Instructions
           Text("Quick Settings Tile Setup Guide", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
           const SizedBox(height: 12),
           _buildStep(1, "Swipe down twice to open full Quick Panel.", isDark),
@@ -307,8 +300,6 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
       ),
     );
   }
-
-  // --- Helpers ---
 
   Widget _buildSectionHeader(String title, bool isDark) {
     return Padding(
@@ -362,7 +353,6 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   }
 }
 
-// --- Custom Painter to Replicate the HTML SVG Exactly ---
 class OneUIPainter extends CustomPainter {
   final bool isDark;
   final Color indigo;
@@ -374,77 +364,59 @@ class OneUIPainter extends CustomPainter {
     final bgPaint = Paint()..color = isDark ? const Color(0xFF252525) : const Color(0xFFF2F2F2);
     final ghostPaint = Paint()..color = isDark ? const Color(0xFF444444) : const Color(0xFFE5E7EB);
     final btnPaint = Paint()..color = isDark ? const Color(0xFF383838) : Colors.white;
-    final textPaint = TextPainter(textDirection: TextDirection.ltr);
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
 
-    // 1. Panel Background
     final rrect = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(24));
     canvas.drawRRect(rrect, bgPaint);
 
-    // 2. Top Bar (Clock)
     _drawText(canvas, "15:50", 25, 45, 20, FontWeight.w600, isDark ? Colors.white : Colors.black);
     _drawText(canvas, "Sun, May 23", 25, 65, 12, FontWeight.normal, Colors.grey);
 
-    // 3. Top Right Ghosts
     canvas.drawCircle(const Offset(250, 40), 10, ghostPaint);
     canvas.drawCircle(const Offset(280, 40), 10, ghostPaint);
     canvas.drawCircle(const Offset(310, 40), 10, ghostPaint);
 
-    // 4. Device/Media Buttons
     final btnRect1 = RRect.fromRectAndRadius(const Rect.fromLTWH(20, 85, 145, 40), const Radius.circular(20));
     final btnRect2 = RRect.fromRectAndRadius(const Rect.fromLTWH(175, 85, 145, 40), const Radius.circular(20));
     canvas.drawRRect(btnRect1, btnPaint);
     canvas.drawRRect(btnRect2, btnPaint);
     
-    // Icons inside buttons
     canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(28, 98, 14, 14), const Radius.circular(3)), ghostPaint);
     canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(183, 98, 14, 14), const Radius.circular(3)), ghostPaint);
     
-    // Text inside buttons
     _drawText(canvas, "Device Control", 50, 110, 11, FontWeight.w600, isDark ? Colors.white : Colors.black);
     _drawText(canvas, "Media Output", 205, 110, 11, FontWeight.w600, isDark ? Colors.white : Colors.black);
 
-    // 5. Grid Logic
-    double startY = 172; // Adjusted for padding
+    double startY = 172; 
     double startX = 42;
     double gapX = 75;
     double gapY = 75;
 
-    // Row 1
     for(int i=0; i<4; i++) canvas.drawCircle(Offset(startX + (i*gapX), startY), 24, ghostPaint);
     
-    // Row 2
     canvas.drawCircle(Offset(startX, startY + gapY), 24, ghostPaint);
     
-    // THE ACTIVE TILE (FlowCTRL)
     final activeCenter = Offset(startX + gapX, startY + gapY);
-    // Glow
     canvas.drawCircle(activeCenter, 28, Paint()..color = indigo.withOpacity(0.3));
-    // Solid Circle
     canvas.drawCircle(activeCenter, 24, Paint()..color = indigo);
-    // Draw Umbrella (Simplified Path)
+    
     final umbPath = Path();
-    umbPath.moveTo(activeCenter.dx - 7, activeCenter.dy - 2); // Left arch
-    umbPath.quadraticBezierTo(activeCenter.dx, activeCenter.dy - 8, activeCenter.dx + 7, activeCenter.dy - 2); // Arch
+    umbPath.moveTo(activeCenter.dx - 7, activeCenter.dy - 2); 
+    umbPath.quadraticBezierTo(activeCenter.dx, activeCenter.dy - 8, activeCenter.dx + 7, activeCenter.dy - 2); 
     umbPath.moveTo(activeCenter.dx, activeCenter.dy - 2); 
-    umbPath.lineTo(activeCenter.dx, activeCenter.dy + 5); // Handle vertical
-    umbPath.quadraticBezierTo(activeCenter.dx, activeCenter.dy + 8, activeCenter.dx + 3, activeCenter.dy + 7); // Handle Hook
+    umbPath.lineTo(activeCenter.dx, activeCenter.dy + 5); 
+    umbPath.quadraticBezierTo(activeCenter.dx, activeCenter.dy + 8, activeCenter.dx + 3, activeCenter.dy + 7); 
     
     canvas.drawPath(umbPath, Paint()..color = Colors.white ..style = PaintingStyle.stroke ..strokeWidth = 2);
 
-    // Rest of Row 2
     canvas.drawCircle(Offset(startX + (2*gapX), startY + gapY), 24, ghostPaint);
     canvas.drawCircle(Offset(startX + (3*gapX), startY + gapY), 24, ghostPaint);
 
-    // Row 3
     for(int i=0; i<4; i++) canvas.drawCircle(Offset(startX + (i*gapX), startY + (2*gapY)), 24, ghostPaint);
 
-    // 6. Brightness Slider
     final sliderRect = RRect.fromRectAndRadius(const Rect.fromLTWH(20, 380, 300, 46), const Radius.circular(23));
     canvas.drawRRect(sliderRect, Paint()..color = isDark ? const Color(0xFF444444) : const Color(0xFFDCDCDC));
     canvas.drawCircle(const Offset(46, 403), 10, ghostPaint);
-
-    // 7. Arrow dashed line (Simplified)
-    // We skip the complex dashed path drawing for simplicity, the "Added" badge serves the purpose.
   }
 
   void _drawText(Canvas canvas, String text, double x, double y, double size, FontWeight weight, Color color) {
@@ -453,7 +425,7 @@ class OneUIPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     );
     textPainter.layout();
-    textPainter.paint(canvas, Offset(x, y - textPainter.height)); // Y is baseline roughly
+    textPainter.paint(canvas, Offset(x, y - textPainter.height));
   }
 
   @override
