@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'main.dart'; // To access ThemeController
+import 'main.dart'; // Import to access ThemeController
 
 class SettingsPage extends StatefulWidget {
   final ThemeController themeController;
@@ -23,8 +23,11 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   final Color kSlate800 = const Color(0xFF1E293B);
   final Color kGray50 = const Color(0xFFF9FAFB);
   final Color kBlue50 = const Color(0xFFEFF6FF);
+  final Color kBlue400 = const Color(0xFF60A5FA); // Added Blue 400
   final Color kBlue600 = const Color(0xFF2563EB);
   final Color kEmerald50 = const Color(0xFFECFDF5);
+  final Color kEmerald400 = const Color(0xFF34D399); // Added Emerald 400
+  final Color kEmerald500 = const Color(0xFF10B981); // Added Emerald 500
   final Color kEmerald600 = const Color(0xFF059669);
 
   // Native Platform Channel
@@ -173,8 +176,9 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
               isDark, textColor,
               onTap: _openDetail,
               icon: Icons.dashboard_customize_outlined,
-              iconColor: isDark ? Colors.blue.shade400 : kBlue600,
-              iconBg: isDark ? Colors.blue.withOpacity(0.1) : kBlue50,
+              // FIX: Use kBlue400 instead of Colors.blue.shade400
+              iconColor: isDark ? kBlue400 : kBlue600,
+              iconBg: isDark ? kBlue400.withOpacity(0.1) : kBlue50,
               title: "Quick Settings Button",
               subtitle: "Custom tile for control panel",
               trailing: Icon(Icons.chevron_right, color: isDark ? Colors.grey[600] : Colors.grey[300]),
@@ -183,8 +187,10 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
             _tile(
               isDark, textColor,
               icon: Icons.apps_outlined,
-              iconColor: isDark ? Colors.emerald.shade400 : kEmerald600,
-              iconBg: isDark ? Colors.emerald.withOpacity(0.1) : kEmerald50,
+              // FIX: Use kEmerald400 instead of Colors.emerald.shade400
+              iconColor: isDark ? kEmerald400 : kEmerald600,
+              // FIX: Use kEmerald500 instead of Colors.emerald
+              iconBg: isDark ? kEmerald500.withOpacity(0.1) : kEmerald50,
               title: "Blocked Apps",
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -290,22 +296,92 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
   Widget _step(int n, String text, bool isDark, {bool highlight = false}) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("$n. ", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)), Expanded(child: highlight ? RichText(text: TextSpan(style: const TextStyle(fontSize: 14, color: Colors.grey, fontFamily: 'Inter'), children: [const TextSpan(text: "Drag "), TextSpan(text: "FlowCTRL", style: TextStyle(color: kIndigo600, fontWeight: FontWeight.bold)), const TextSpan(text: " from the list.")])) : Text(text, style: const TextStyle(color: Colors.grey, fontSize: 14)))]));
 }
 
-// (Reuse OneUIPainter from previous response, it was correct. Just ensure it is included at bottom of file)
+// --- Custom Painter for OneUI Illustration ---
 class OneUIPainter extends CustomPainter {
   final bool isDark;
   final Color indigo;
+
   OneUIPainter({required this.isDark, required this.indigo});
+
   @override
   void paint(Canvas canvas, Size size) {
-    // ... [Paste the exact OneUIPainter code from previous response here] ...
-    // For brevity, I am assuming you have the previous code. 
-    // If you need it again, I can paste it, but it fits in the file structure here.
-    
-    // Minimal placeholder to ensure compilation if you forget to copy-paste:
     final bgPaint = Paint()..color = isDark ? const Color(0xFF252525) : const Color(0xFFF2F2F2);
+    final ghostPaint = Paint()..color = isDark ? const Color(0xFF444444) : const Color(0xFFE5E7EB);
+    final btnPaint = Paint()..color = isDark ? const Color(0xFF383838) : Colors.white;
+
+    // Panel Background
     canvas.drawRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(24)), bgPaint);
-    // (You should use the full painter code provided previously for the visual match)
+
+    // Top Bar
+    _drawText(canvas, "15:50", 25, 45, 20, FontWeight.w600, isDark ? Colors.white : Colors.black);
+    _drawText(canvas, "Sun, May 23", 25, 65, 12, FontWeight.normal, Colors.grey);
+    
+    // Ghost Icons Top Right
+    canvas.drawCircle(const Offset(250, 40), 10, ghostPaint);
+    canvas.drawCircle(const Offset(280, 40), 10, ghostPaint);
+    canvas.drawCircle(const Offset(310, 40), 10, ghostPaint);
+
+    // Buttons
+    final btnRect1 = RRect.fromRectAndRadius(const Rect.fromLTWH(20, 85, 145, 40), const Radius.circular(20));
+    final btnRect2 = RRect.fromRectAndRadius(const Rect.fromLTWH(175, 85, 145, 40), const Radius.circular(20));
+    canvas.drawRRect(btnRect1, btnPaint);
+    canvas.drawRRect(btnRect2, btnPaint);
+    
+    // Button content
+    canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(28, 98, 14, 14), const Radius.circular(3)), ghostPaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(183, 98, 14, 14), const Radius.circular(3)), ghostPaint);
+    _drawText(canvas, "Device Control", 50, 110, 11, FontWeight.w600, isDark ? Colors.white : Colors.black);
+    _drawText(canvas, "Media Output", 205, 110, 11, FontWeight.w600, isDark ? Colors.white : Colors.black);
+
+    // Grid Logic
+    double startY = 172; 
+    double startX = 42;
+    double gapX = 75;
+    double gapY = 75;
+
+    // Row 1
+    for(int i=0; i<4; i++) canvas.drawCircle(Offset(startX + (i*gapX), startY), 24, ghostPaint);
+    
+    // Row 2
+    canvas.drawCircle(Offset(startX, startY + gapY), 24, ghostPaint);
+    
+    // ACTIVE TILE (FlowCTRL)
+    final activeCenter = Offset(startX + gapX, startY + gapY);
+    canvas.drawCircle(activeCenter, 28, Paint()..color = indigo.withOpacity(0.3));
+    canvas.drawCircle(activeCenter, 24, Paint()..color = indigo);
+    
+    // Umbrella Icon
+    final umbPath = Path();
+    umbPath.moveTo(activeCenter.dx - 7, activeCenter.dy - 2); 
+    umbPath.quadraticBezierTo(activeCenter.dx, activeCenter.dy - 8, activeCenter.dx + 7, activeCenter.dy - 2); 
+    umbPath.moveTo(activeCenter.dx, activeCenter.dy - 2); 
+    umbPath.lineTo(activeCenter.dx, activeCenter.dy + 5); 
+    umbPath.quadraticBezierTo(activeCenter.dx, activeCenter.dy + 8, activeCenter.dx + 3, activeCenter.dy + 7); 
+    
+    canvas.drawPath(umbPath, Paint()..color = Colors.white ..style = PaintingStyle.stroke ..strokeWidth = 2);
+
+    // Rest of Row 2
+    canvas.drawCircle(Offset(startX + (2*gapX), startY + gapY), 24, ghostPaint);
+    canvas.drawCircle(Offset(startX + (3*gapX), startY + gapY), 24, ghostPaint);
+
+    // Row 3
+    for(int i=0; i<4; i++) canvas.drawCircle(Offset(startX + (i*gapX), startY + (2*gapY)), 24, ghostPaint);
+
+    // Slider
+    final sliderRect = RRect.fromRectAndRadius(const Rect.fromLTWH(20, 380, 300, 46), const Radius.circular(23));
+    canvas.drawRRect(sliderRect, Paint()..color = isDark ? const Color(0xFF444444) : const Color(0xFFDCDCDC));
+    canvas.drawCircle(const Offset(46, 403), 10, ghostPaint);
   }
+
+  void _drawText(Canvas canvas, String text, double x, double y, double size, FontWeight weight, Color color) {
+    final textPainter = TextPainter(
+      text: TextSpan(text: text, style: TextStyle(color: color, fontSize: size, fontWeight: weight, fontFamily: 'Inter')),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(x, y - textPainter.height));
+  }
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
