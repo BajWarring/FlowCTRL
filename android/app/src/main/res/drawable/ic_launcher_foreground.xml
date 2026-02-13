@@ -45,10 +45,3 @@
           android:pathData="M256 280V360C256 380 270 390 280 390"/>
   </group>
 </vector>
-  <path
-      android:strokeWidth="35"
-      android:strokeColor="#FFFFFF"
-      android:strokeLineCap="round"
-      android:pathData="M256 280V360C256 380 270 390 280 390"/>
-
-</vector>
