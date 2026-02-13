@@ -5,82 +5,58 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.content.SharedPreferences
 import android.content.Context
-import android.os.SystemClock
 
 class FlowAccessibilityService : AccessibilityService() {
 
-    private var isBlockingEnabled = true
-    private var lastBackPressTime: Long = 0
-    private val BACK_PRESS_COOLDOWN = 1500L 
-
     override fun onServiceConnected() {
         super.onServiceConnected()
-        val prefs: SharedPreferences = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        // SCREAM that we are alive so the UI hears it
+        val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         prefs.edit().putBoolean("flutter.service_active", true).apply()
-        isBlockingEnabled = prefs.getBoolean("flutter.isBlockingEnabled", true)
-    }
-
-    override fun onUnbind(intent: android.content.Intent?): Boolean {
-        val prefs: SharedPreferences = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("flutter.service_active", false).apply()
-        return super.onUnbind(intent)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // --- THE FIX ---
-        // We must reload the settings BEFORE we decide to return/stop.
-        // Previously, this was below the check, so once it was false, it never checked again.
-        val prefs: SharedPreferences = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        isBlockingEnabled = prefs.getBoolean("flutter.isBlockingEnabled", true)
-
-        // 1. Basic Checks
-        if (!isBlockingEnabled || event == null) return
-        if (event.packageName?.toString() != "com.google.android.youtube") return
-
-        // 2. Cooldown
-        if (SystemClock.elapsedRealtime() - lastBackPressTime < BACK_PRESS_COOLDOWN) {
-            return
+        val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        
+        // 1. RE-CONFIRM "ALIVE" STATUS (Fixes the persistent popup bug)
+        // Every time an event happens, we remind Flutter we are here.
+        if (!prefs.getBoolean("flutter.service_active", false)) {
+            prefs.edit().putBoolean("flutter.service_active", true).apply()
         }
 
-        if (isBlockingEnabled) {
-            val rootNode = rootInActiveWindow ?: return
-            
-            if (rootNode.packageName?.toString() == "com.google.android.youtube") {
-                 if (isShortsPlayer(rootNode)) {
-                    performGlobalAction(GLOBAL_ACTION_BACK)
-                    lastBackPressTime = SystemClock.elapsedRealtime()
-                }
-            }
+        // 2. CHECK BLOCKING STATUS
+        val isBlockingEnabled = prefs.getBoolean("flutter.isBlockingEnabled", true)
+        if (!isBlockingEnabled) return
+
+        // 3. CHECK PACKAGE
+        if (event?.packageName?.toString() != "com.google.android.youtube") return
+
+        // 4. SCAN FOR SHORTS
+        val rootNode = rootInActiveWindow ?: return
+        if (isShortsPlayer(rootNode)) {
+            performGlobalAction(GLOBAL_ACTION_BACK)
         }
     }
 
     private fun isShortsPlayer(root: AccessibilityNodeInfo): Boolean {
-        // STRATEGY 1: Internal View IDs
+        // STRATEGY: Check for specific Shorts UI elements
+        
+        // 1. "reel_recycler" is the main container for Shorts
         val reelRecycler = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_recycler")
         if (reelRecycler != null && !reelRecycler.isEmpty()) return true
 
-        val reelTouch = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_touch_helper_0")
-        if (reelTouch != null && !reelTouch.isEmpty()) return true
-
+        // 2. "reel_player_view" is the video player
         val reelPlayer = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_player_view")
         if (reelPlayer != null && !reelPlayer.isEmpty()) return true
 
-        // STRATEGY 2: Contextual Text Check
-        val shortsTextNodes = root.findAccessibilityNodeInfosByText("Shorts")
-        val hasShortsText = shortsTextNodes != null && !shortsTextNodes.isEmpty()
-
-        if (hasShortsText) {
-            val likeNodes = root.findAccessibilityNodeInfosByText("Like")
-            val commentNodes = root.findAccessibilityNodeInfosByText("Comment")
-            val dislikeNodes = root.findAccessibilityNodeInfosByText("Dislike")
-            val subscribeNodes = root.findAccessibilityNodeInfosByText("Subscribe")
-
-            val hasEngagement = (likeNodes != null && !likeNodes.isEmpty()) ||
-                                (commentNodes != null && !commentNodes.isEmpty()) ||
-                                (dislikeNodes != null && !dislikeNodes.isEmpty()) ||
-                                (subscribeNodes != null && !subscribeNodes.isEmpty())
-
-            if (hasEngagement) {
+        // 3. Fallback: Text detection (Nuclear option for different YT versions)
+        val shortsText = root.findAccessibilityNodeInfosByText("Shorts")
+        if (shortsText != null && !shortsText.isEmpty()) {
+            // Confirm it's the player by looking for "Like" button nearby
+            val likeBtn = root.findAccessibilityNodeInfosByText("Like")
+            val commentBtn = root.findAccessibilityNodeInfosByText("Comment")
+            
+            if ((likeBtn != null && !likeBtn.isEmpty()) || (commentBtn != null && !commentBtn.isEmpty())) {
                 return true
             }
         }
@@ -88,4 +64,10 @@ class FlowAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {}
+    
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("flutter.service_active", false).apply()
+        return super.onUnbind(intent)
+    }
 }
