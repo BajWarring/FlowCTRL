@@ -248,10 +248,9 @@ class OneUIPainter extends CustomPainter {
     canvas.drawCircle(activeCenter, 28, Paint()..color = indigo.withOpacity(0.2));
     canvas.drawCircle(activeCenter, 24, Paint()..color = indigo);
     
-    // Umbrella (Abs Pos: translate(95, 75) + (10,10) inside grid)
-    // Actually simpler to just draw relative to active center since it's centered there in SVG
+    // Umbrella
     canvas.save();
-    canvas.translate(activeCenter.dx - 12, activeCenter.dy - 12); // Center 24x24 icon
+    canvas.translate(activeCenter.dx - 12, activeCenter.dy - 12); 
     final p = Path();
     p.moveTo(5, 14); p.cubicTo(5, 9, 12, 7, 12, 7); p.cubicTo(12, 7, 19, 9, 19, 14);
     final paintStroke = Paint()..color = Colors.white ..style = PaintingStyle.stroke ..strokeWidth = 2 ..strokeCap = StrokeCap.round;
@@ -283,14 +282,16 @@ class OneUIPainter extends CustomPainter {
     canvas.translate(254, 28);
     canvas.scale(-1, 1);
     final dash = Path(); dash.moveTo(90, 220); dash.quadraticBezierTo(60, 210, 50, 190);
-    // Draw Dashed Line
+    // Dashed Line (Manual loop for Flutter)
     final dashPaint = Paint()..color = indigo ..style = PaintingStyle.stroke ..strokeWidth = 2;
-    // Simple dash logic
-    for (double i = 0; i < 1; i += 0.1) {
-       // Simplified curve drawing or just draw solid for clarity as implementation of generic dash is complex
+    PathMetrics metrics = dash.computeMetrics();
+    for (PathMetric metric in metrics) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(metric.extractPath(distance, distance + 5), dashPaint);
+        distance += 8; // 5 dash + 3 gap
+      }
     }
-    // For simplicity in this code block, drawing solid curve but visually it matches location
-    canvas.drawPath(dash, dashPaint); 
     canvas.drawCircle(const Offset(50, 190), 4, Paint()..color = indigo);
     canvas.restore();
 
@@ -306,8 +307,11 @@ class OneUIPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _circle(Canvas c, double x, double y, Offset offset, Paint p) => c.drawCircle(offset + Offset(x, y), 24, p);
-  void _text(Canvas c, String t, double x, double y, double s, FontWeight w, Color color) {
+  // FIX: Parameter name matches body
+  void _circle(Canvas canvas, double x, double y, Offset offset, Paint p) => canvas.drawCircle(offset + Offset(x, y), 24, p);
+  
+  // FIX: Parameter name matches body
+  void _text(Canvas canvas, String t, double x, double y, double s, FontWeight w, Color color) {
     final tp = TextPainter(text: TextSpan(text: t, style: TextStyle(color: color, fontSize: s, fontWeight: w, fontFamily: 'sans-serif')), textDirection: TextDirection.ltr);
     tp.layout();
     tp.paint(canvas, Offset(x, y - tp.height));
