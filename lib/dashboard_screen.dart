@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_accessibility_service/flutter_accessibility_service.dart';
-import 'main.dart'; // Import to access ThemeController
+import 'main.dart';
 import 'settings_page.dart';
 
 class DashboardScreen extends StatefulWidget {
-  final ThemeController themeController; // Accept controller
+  final ThemeController themeController;
 
   const DashboardScreen({super.key, required this.themeController});
 
@@ -54,18 +55,22 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   void _startPermissionMonitor() {
-    // Check every 1s
     _monitorTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _checkPermissionNow();
     });
   }
 
   Future<void> _checkPermissionNow() async {
+    // 1. Ask OS (Sometimes slow)
     bool osPermission = await FlutterAccessibilityService.isAccessibilityPermissionEnabled();
+    
+    // 2. Ask Storage (Fast & Reliable backup)
     final prefs = await SharedPreferences.getInstance();
-    bool serviceRunning = prefs.getBool('flutter.service_active') ?? false;
+    
+    // FIX: Removed 'flutter.' prefix. The plugin adds it automatically.
+    // Now it correctly looks for "flutter.service_active" which Kotlin wrote.
+    bool serviceRunning = prefs.getBool('service_active') ?? false;
 
-    // Logic: If OS says yes OR service says yes -> It is enabled.
     bool actuallyEnabled = osPermission || serviceRunning;
 
     if (actuallyEnabled != _isServiceEnabled) {
@@ -87,7 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     setState(() => _isBlockingEnabled = newValue);
   }
 
-  // --- UI Helpers for cleaner build method ---
+  // Helpers
   bool get _isDark => widget.themeController.value;
   Color get _bgColor => _isDark ? kSlate950 : kBgLight;
   Color get _cardColor => _isDark ? kSlate900 : Colors.white;
@@ -144,10 +149,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     );
   }
 
-  // ... [Keep _buildHeroSection, _buildAppsList, _buildAppItem, _buildPermissionOverlay exactly as before]
-  // ... [Just ensure they use the new _cardColor / _textColor getters]
-  
-  // Re-pasting critical sections for context, assuming previous helper methods are retained:
   Widget _buildHeroSection() {
     return Container(
       width: double.infinity,
