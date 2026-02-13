@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_accessibility_service/flutter_accessibility_service.dart';
+import 'settings_page.dart'; // Import the settings page we created
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -15,20 +17,29 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   // --- State Variables ---
   bool _isServiceEnabled = false; 
   bool _isBlockingEnabled = true; 
+  bool _isDarkMode = false; // Added to support Theme Toggle
   Timer? _monitorTimer;
   late AnimationController _spinController;
 
-  // --- Constants ---
+  // --- Constants (Tailwind-ish) ---
   final Color kIndigo = const Color(0xFF4F46E5);
   final Color kIndigoLight = const Color(0xFF818CF8);
+  
+  // Light Mode Colors
   final Color kGray900 = const Color(0xFF111827);
   final Color kGray400 = const Color(0xFF9CA3AF);
-  final Color kBgWhite = const Color(0xFFF9FAFB);
+  final Color kBgLight = const Color(0xFFF9FAFB);
+  
+  // Dark Mode Colors
+  final Color kSlate950 = const Color(0xFF020617);
+  final Color kSlate900 = const Color(0xFF0F172A);
+  final Color kSlate800 = const Color(0xFF1E293B);
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this); 
+    
     _spinController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -50,22 +61,29 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkPermissionNow();
+      // Reload styling in case system theme changed
+      _loadState(); 
     }
   }
 
   // --- Logic ---
 
   void _startPermissionMonitor() {
+    // Check every 1s to auto-dismiss popup
     _monitorTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       _checkPermissionNow();
     });
   }
 
   Future<void> _checkPermissionNow() async {
+    // 1. OS Check
     bool osPermission = await FlutterAccessibilityService.isAccessibilityPermissionEnabled();
+    
+    // 2. Service "I am Alive" Check
     final prefs = await SharedPreferences.getInstance();
-    bool serviceRunning = prefs.getBool('service_active') ?? false;
+    bool serviceRunning = prefs.getBool('flutter.service_active') ?? false;
 
+    // If either tells us yes, we assume yes.
     bool actuallyEnabled = osPermission || serviceRunning;
 
     if (actuallyEnabled != _isServiceEnabled) {
@@ -81,6 +99,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _isBlockingEnabled = prefs.getBool('isBlockingEnabled') ?? true;
+      _isDarkMode = prefs.getBool('isDarkMode') ?? false; // Load Theme
     });
     _checkPermissionNow();
   }
@@ -93,14 +112,28 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     });
   }
 
-  // --- UI Builders ---
+  Future<void> _toggleTheme() async {
+    final newValue = !_isDarkMode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', newValue);
+    setState(() {
+      _isDarkMode = newValue;
+    });
+  }
+
+  // --- UI Helpers ---
+  Color get _bgColor => _isDarkMode ? kSlate950 : kBgLight;
+  Color get _cardColor => _isDarkMode ? kSlate900 : Colors.white;
+  Color get _textColor => _isDarkMode ? Colors.white : kGray900;
+  Color get _subTextColor => _isDarkMode ? kGray400 : Colors.grey;
 
   @override
   Widget build(BuildContext context) {
-    // FIX: Removed the outer "Center" and "Container" constraints.
-    // The Scaffold now IS the screen, filling it completely.
+    // Set System UI Overlay Style (Status Bar Color)
+    SystemChrome.setSystemUIOverlayStyle(_isDarkMode ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark);
+
     return Scaffold(
-      backgroundColor: kBgWhite, 
+      backgroundColor: _bgColor,
       body: Stack(
         children: [
           Column(
@@ -108,6 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               _buildHeader(),
               Expanded(
                 child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
                   child: Column(
                     children: [
                       _buildHeroSection(),
@@ -130,8 +164,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   Widget _buildHeader() {
     return Container(
-      color: Colors.white, 
-      // Added SafeArea padding for top notch
+      color: _cardColor, 
       padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24, 24, 10), 
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -141,13 +174,23 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: kGray900,
+              color: _textColor,
               letterSpacing: -0.5,
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.settings, color: Colors.grey),
-            onPressed: () {}, 
+            icon: Icon(Icons.settings, color: _subTextColor),
+            onPressed: () {
+              // Navigate to Settings Page
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => SettingsPage(
+                    isDarkMode: _isDarkMode,
+                    onThemeToggle: _toggleTheme,
+                  ),
+                ),
+              );
+            }, 
           )
         ],
       ),
@@ -159,11 +202,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       width: double.infinity,
       padding: const EdgeInsets.only(top: 20, bottom: 60), 
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _cardColor,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(40)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(_isDarkMode ? 0.3 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           )
@@ -186,7 +229,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w500,
-              color: _isBlockingEnabled ? kIndigo : kGray900,
+              color: _isBlockingEnabled ? kIndigo : _textColor,
             ),
           ),
           const SizedBox(height: 40),
@@ -197,6 +240,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             child: Stack(
               alignment: Alignment.center,
               children: [
+                // 1. Glow
                 if (_isBlockingEnabled)
                   Container(
                     width: 180,
@@ -213,6 +257,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     ),
                   ),
 
+                // 2. Rotating Light
                 if (_isBlockingEnabled)
                   AnimatedBuilder(
                     animation: _spinController,
@@ -239,11 +284,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     },
                   ),
 
+                // 3. Inner Button
                 Container(
                   width: 172,
                   height: 172,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _cardColor,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
@@ -251,11 +297,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
-                       const BoxShadow(
-                        color: Colors.white,
+                       BoxShadow(
+                        color: _cardColor,
                         blurRadius: 0,
                         spreadRadius: 2,
-                        offset: Offset(0, 0),
+                        offset: const Offset(0, 0),
                       ),
                     ],
                   ),
@@ -309,9 +355,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           const SizedBox(height: 16),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _cardColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade100),
+              border: Border.all(color: _isDarkMode ? kSlate800 : Colors.grey.shade100),
               boxShadow: const [
                  BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0,2))
               ]
@@ -321,17 +367,17 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 _buildAppItem(
                   icon: Icons.play_arrow_rounded,
                   iconColor: Colors.red,
-                  bgIconColor: Colors.red.shade50,
+                  bgIconColor: Colors.red.withOpacity(0.1),
                   name: "YouTube",
                   desc: "Block shorts",
                   isOn: _isBlockingEnabled,
                   onToggle: (val) => _toggleBlocking(val),
                 ),
-                Container(height: 1, color: Colors.grey.shade50),
+                Container(height: 1, color: _isDarkMode ? kSlate800 : Colors.grey.shade50),
                 _buildAppItem(
                   icon: Icons.camera_alt_outlined,
                   iconColor: Colors.pink,
-                  bgIconColor: Colors.pink.shade50,
+                  bgIconColor: Colors.pink.withOpacity(0.1),
                   name: "Instagram",
                   desc: "Block reels",
                   isOn: false,
@@ -377,7 +423,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
-                    color: kGray900,
+                    color: _textColor,
                   ),
                 ),
                 Text(
@@ -397,7 +443,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               width: 50,
               height: 28,
               decoration: BoxDecoration(
-                color: isOn ? kIndigo : Colors.grey.shade300,
+                color: isOn ? kIndigo : (_isDarkMode ? kSlate800 : Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Stack(
@@ -410,11 +456,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     child: Container(
                       width: 24,
                       height: 24,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
                         boxShadow: [
-                           BoxShadow(color: Colors.black12, blurRadius: 2)
+                           BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 2)
                         ]
                       ),
                     ),
@@ -432,16 +478,13 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     return GestureDetector(
       onTap: _checkPermissionNow, 
       child: Container(
-        color: Colors.black.withOpacity(0.6), // Standard dark overlay
-        // FIX: Removed "Center -> Container" that made it a floating card
-        // Now it uses a Dialog-style layout or just full screen if you prefer.
-        // I will keep the Center but remove the "margin" that caused creases.
+        color: Colors.black.withOpacity(0.8), // Darker overlay
         child: Center(
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 24),
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _isDarkMode ? kSlate900 : Colors.white,
               borderRadius: BorderRadius.circular(24),
             ),
             child: Column(
@@ -454,7 +497,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: kGray900,
+                    color: _textColor,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -488,6 +531,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 
                 TextButton(
                   onPressed: () {
+                    // Manual Override
                     setState(() {
                       _isServiceEnabled = true;
                     });
