@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512"
+    android:tint="?android:attr/colorControlNormal">
+  
+  <group 
+      android:scaleX="0.8"
+      android:scaleY="0.8"
+      android:pivotX="256"
+      android:pivotY="256">
+      
+      <path
+          android:fillColor="@android:color/white"
+          android:pathData="M120 280C120 200 256 160 256 160C256 160 392 200 392 280 L 392 285 L 120 285 Z"/>
+
+      <path
+          android:fillColor="@android:color/white"
+          android:pathData="M238 280 L274 280 L274 360 C274 380 288 390 298 390 L298 425 C270 425 238 400 238 360 Z"/>
+          
+      <path android:fillColor="@android:color/white" android:pathData="M150 100 L162 100 L162 150 L150 150 Z"/>
+      <path android:fillColor="@android:color/white" android:pathData="M250 80 L262 80 L262 130 L250 130 Z"/>
+      <path android:fillColor="@android:color/white" android:pathData="M350 100 L362 100 L362 150 L350 150 Z"/>
+  </group>
+</vector>
