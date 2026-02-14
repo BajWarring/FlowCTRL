@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_accessibility_service/flutter_accessibility_service.dart';
 import 'main.dart';
 import 'settings_page.dart';
-import 'permission_popup.dart'; // Import new popup
+import 'permission_popup.dart'; 
 
 class DashboardScreen extends StatefulWidget {
   final ThemeController themeController;
@@ -19,9 +19,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   bool _isServiceEnabled = false; 
-  bool _isBlockingEnabled = true; // Master Switch
-  
-  // INDIVIDUAL APP STATES
+  bool _isBlockingEnabled = true; 
   bool _isYouTubeBlocked = true; 
   bool _isInstagramBlocked = true;
 
@@ -57,7 +55,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _checkPermissionNow();
+    if (state == AppLifecycleState.resumed) {
+      // FIX: Add small delay to prevent crash when returning from Settings
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _checkPermissionNow();
+      });
+    }
   }
 
   void _startPermissionMonitor() {
@@ -67,13 +70,18 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   Future<void> _checkPermissionNow() async {
-    bool osPermission = await FlutterAccessibilityService.isAccessibilityPermissionEnabled();
-    final prefs = await SharedPreferences.getInstance();
-    bool serviceRunning = prefs.getBool('service_active') ?? false;
-    bool actuallyEnabled = osPermission || serviceRunning;
+    try {
+      // FIX: Wrapped in try-catch to handle plugin instability
+      bool osPermission = await FlutterAccessibilityService.isAccessibilityPermissionEnabled();
+      final prefs = await SharedPreferences.getInstance();
+      bool serviceRunning = prefs.getBool('service_active') ?? false;
+      bool actuallyEnabled = osPermission || serviceRunning;
 
-    if (actuallyEnabled != _isServiceEnabled) {
-      if (mounted) setState(() => _isServiceEnabled = actuallyEnabled);
+      if (actuallyEnabled != _isServiceEnabled) {
+        if (mounted) setState(() => _isServiceEnabled = actuallyEnabled);
+      }
+    } catch (e) {
+      debugPrint("Permission Check Error: $e");
     }
   }
 
@@ -84,27 +92,44 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       _isYouTubeBlocked = prefs.getBool('isYouTubeBlocked') ?? true;
       _isInstagramBlocked = prefs.getBool('isInstagramBlocked') ?? true;
     });
+    // Run sync logic once on load
+    _syncMasterState(); 
     _checkPermissionNow();
   }
 
-  // --- TOGGLES ---
+  // --- LOGIC: MASTER BUTTON SYNC ---
+  void _syncMasterState() {
+    // If BOTH apps are off, Master should be OFF.
+    if (!_isYouTubeBlocked && !_isInstagramBlocked) {
+      if (_isBlockingEnabled) _toggleMaster(false);
+    }
+    // If ANY app is ON, Master should be ON (if it was off).
+    else if ((_isYouTubeBlocked || _isInstagramBlocked) && !_isBlockingEnabled) {
+      _toggleMaster(true);
+    }
+  }
 
   Future<void> _toggleMaster(bool newValue) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isBlockingEnabled', newValue);
     setState(() => _isBlockingEnabled = newValue);
+    
+    // Optional: If Master turned OFF, UI visually updates.
+    // If Master turned ON, we leave the individual switches as they were.
   }
 
   Future<void> _toggleYouTube(bool newValue) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isYouTubeBlocked', newValue);
     setState(() => _isYouTubeBlocked = newValue);
+    _syncMasterState(); // Check if we need to update Master
   }
 
   Future<void> _toggleInstagram(bool newValue) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isInstagramBlocked', newValue);
     setState(() => _isInstagramBlocked = newValue);
+    _syncMasterState(); // Check if we need to update Master
   }
 
   // Helpers
@@ -138,7 +163,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           if (!_isServiceEnabled) 
              Positioned.fill(
                child: PermissionPopup(
-                 onDismiss: () => setState(() => _isServiceEnabled = true), // Manual override
+                 onDismiss: () => setState(() => _isServiceEnabled = true), 
                ),
              ),
         ],
@@ -209,26 +234,24 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           Container(
             decoration: BoxDecoration(color: _cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: _isDark ? kSlate800 : Colors.grey.shade100), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0,2))]),
             child: Column(children: [
-              // YOUTUBE
               _buildAppItem(
                 icon: Icons.play_arrow_rounded, 
                 iconColor: Colors.red, 
                 bgIconColor: Colors.red.withOpacity(0.1), 
                 name: "YouTube", 
                 desc: "Block shorts", 
-                isOn: _isYouTubeBlocked, // Connected to state
-                onToggle: (val) => _toggleYouTube(val) // Connected to handler
+                isOn: _isYouTubeBlocked, 
+                onToggle: (val) => _toggleYouTube(val)
               ),
               Container(height: 1, color: _isDark ? kSlate800 : Colors.grey.shade50),
-              // INSTAGRAM (FIXED)
               _buildAppItem(
                 icon: Icons.camera_alt_outlined, 
                 iconColor: Colors.pink, 
                 bgIconColor: Colors.pink.withOpacity(0.1), 
                 name: "Instagram", 
                 desc: "Block reels", 
-                isOn: _isInstagramBlocked, // Connected to state
-                onToggle: (val) => _toggleInstagram(val) // Connected to handler
+                isOn: _isInstagramBlocked, 
+                onToggle: (val) => _toggleInstagram(val)
               ),
             ]),
           ),
