@@ -6,6 +6,8 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.content.SharedPreferences
 import android.content.Context
 import android.os.SystemClock
+import android.graphics.Rect
+import kotlin.math.abs
 
 class FlowAccessibilityService : AccessibilityService() {
 
@@ -69,24 +71,57 @@ class FlowAccessibilityService : AccessibilityService() {
     }
 
     private fun detectInstagramReels(root: AccessibilityNodeInfo): Boolean {
-        // 1. Check for specific IDs
-        if (hasId(root, "com.instagram.android:id/clips_video_container")) return true
-        if (hasId(root, "com.instagram.android:id/clips_viewer_root")) return true
-        if (hasId(root, "com.instagram.android:id/reel_viewer_root")) return true
-
-        // 2. Check for "Reels" Tab being selected
-        // This is often a frame layout with description "Reels, tab" or similar
-        val reelsTab = root.findAccessibilityNodeInfosByText("Reels")
-        if (reelsTab != null) {
-            for (node in reelsTab) {
-                if (node.isSelected) return true // You are ON the Reels tab
+        // STRATEGY 1: The "Reels" Tab Selection
+        // If the bottom bar "Reels" tab is selected, we are 100% in Reels.
+        val reelsTabs = root.findAccessibilityNodeInfosByText("Reels")
+        if (reelsTabs != null && !reelsTabs.isEmpty()) {
+            for (node in reelsTabs) {
+                if (node.isVisibleToUser && (node.isSelected || node.isChecked)) return true
+                // Sometimes the parent container is the one marked selected
+                if (node.parent != null && node.parent.isSelected) return true
             }
         }
 
-        // 3. Check for specific Content Descriptions inside the viewer
-        // "Reel by [user]" is a common description
-        val reelsBy = root.findAccessibilityNodeInfosByText("Reel by")
-        if (reelsBy != null && !reelsBy.isEmpty()) return true
+        // STRATEGY 2: GEOMETRIC VERTICAL STACK CHECK
+        // We look for "Like" and "Comment" buttons.
+        // In Feed, they are Horizontal (Left to Right).
+        // In Reels, they are Vertical (Top to Bottom).
+        
+        val likes = root.findAccessibilityNodeInfosByText("Like")
+        val comments = root.findAccessibilityNodeInfosByText("Comment") // or "Comment..."
+
+        if (likes != null && !likes.isEmpty() && comments != null && !comments.isEmpty()) {
+            // Get the first visible Like button
+            var likeNode: AccessibilityNodeInfo? = null
+            for (node in likes) {
+                if (node.isVisibleToUser) { likeNode = node; break }
+            }
+
+            // Get the first visible Comment button
+            var commentNode: AccessibilityNodeInfo? = null
+            for (node in comments) {
+                if (node.isVisibleToUser) { commentNode = node; break }
+            }
+
+            if (likeNode != null && commentNode != null) {
+                val likeRect = Rect()
+                val commentRect = Rect()
+                likeNode.getBoundsInScreen(likeRect)
+                commentNode.getBoundsInScreen(commentRect)
+
+                val xDiff = abs(likeRect.left - commentRect.left)
+                val yDiff = abs(likeRect.top - commentRect.top)
+
+                // LOGIC: 
+                // If Y difference (Vertical) is bigger than X difference (Horizontal),
+                // AND they are reasonably close to each other (not random buttons on screen),
+                // THEN it is a Vertical Stack -> REELS.
+                
+                if (yDiff > xDiff && yDiff > 50) {
+                     return true
+                }
+            }
+        }
 
         return false
     }
