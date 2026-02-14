@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
-import 'main.dart';
+import 'main.dart'; // To access ThemeController
 
 class SplashScreen extends StatefulWidget {
   final ThemeController themeController;
@@ -12,78 +13,28 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Navigate to Dashboard after 3 seconds
-    Timer(const Duration(seconds: 3), () {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => DashboardScreen(themeController: widget.themeController),
-        ),
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF4F46E5), // Brand Indigo
-      body: Center(
-        // Using your custom animation widget
-        child: FlowCtrlLogoAnimation(size: 250),
-      ),
-    );
-  }
-}
-
-// === YOUR ANIMATION CODE BELOW ===
-
-class FlowCtrlLogoAnimation extends StatefulWidget {
-  final double size;
-  
-  const FlowCtrlLogoAnimation({
-    super.key,
-    this.size = 200.0,
-  });
-
-  @override
-  State<FlowCtrlLogoAnimation> createState() => _FlowCtrlLogoAnimationState();
-}
-
-class _FlowCtrlLogoAnimationState extends State<FlowCtrlLogoAnimation>
-    with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _drop1Animation;
-  late Animation<double> _drop2Animation;
-  late Animation<double> _drop3Animation;
 
   @override
   void initState() {
     super.initState();
-    
+    // 1. Setup Animation: Duration 1.5s repeating
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 2000),
       vsync: this,
-    );
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
 
-    _drop1Animation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
-    ));
-
-    _drop2Animation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.15, 0.65, curve: Curves.easeIn),
-    ));
-
-    _drop3Animation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.3, 0.8, curve: Curves.easeIn),
-    ));
-
-    _controller.repeat();
+    // 2. Setup Navigation: Go to Dashboard after 3 seconds
+    Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => DashboardScreen(themeController: widget.themeController),
+          ),
+        );
+      }
+    });
   }
 
   @override
@@ -94,105 +45,118 @@ class _FlowCtrlLogoAnimationState extends State<FlowCtrlLogoAnimation>
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: widget.size,
-      height: widget.size,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return CustomPaint(
-            painter: FlowCtrlLogoPainter(
-              drop1Progress: _drop1Animation.value,
-              drop2Progress: _drop2Animation.value,
-              drop3Progress: _drop3Animation.value,
-            ),
-          );
-        },
+    return Scaffold(
+      backgroundColor: const Color(0xFF4F46E5), // Deep Indigo
+      body: Center(
+        child: SizedBox(
+          width: 400,
+          height: 400,
+          child: CustomPaint(
+            painter: UmbrellaPainter(animation: _controller),
+          ),
+        ),
       ),
     );
   }
 }
 
-class FlowCtrlLogoPainter extends CustomPainter {
-  final double drop1Progress;
-  final double drop2Progress;
-  final double drop3Progress;
+// === YOUR CUSTOM PAINTER ===
+class UmbrellaPainter extends CustomPainter {
+  final Animation<double> animation;
 
-  FlowCtrlLogoPainter({
-    required this.drop1Progress,
-    required this.drop2Progress,
-    required this.drop3Progress,
-  });
+  UmbrellaPainter({required this.animation}) : super(repaint: animation);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = Colors.white;
+    // Translate to center + 15 offset as per SVG logic
+    canvas.translate(size.width / 2, size.height / 2 + 15);
 
-    final strokePaint = Paint()
-      ..style = PaintingStyle.stroke
+    final Paint whitePaint = Paint()..color = Colors.white;
+    final Paint whiteOpacityPaint = Paint()..color = Colors.white.withOpacity(0.5);
+    final Paint strokePaint = Paint()
       ..color = Colors.white
-      ..strokeWidth = size.width * 0.015
-      ..strokeCap = StrokeCap.round;
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 6;
 
-    final scale = size.width / 400;
-    final centerX = size.width / 2;
-    final centerY = size.height / 2 + (size.height * 0.075);
-    double s(double value) => value * scale;
-
-    // === UMBRELLA ===
-    final umbrellaTopPath = Path();
-    umbrellaTopPath.moveTo(centerX, centerY - s(60));
-    umbrellaTopPath.lineTo(centerX - s(60), centerY - s(25));
-    umbrellaTopPath.lineTo(centerX, centerY - s(25));
-    umbrellaTopPath.lineTo(centerX + s(60), centerY - s(25));
-    umbrellaTopPath.close();
-    canvas.drawPath(umbrellaTopPath, paint);
-
-    final umbrellaCurvePath = Path();
-    umbrellaCurvePath.moveTo(centerX - s(60), centerY - s(25));
-    umbrellaCurvePath.quadraticBezierTo(centerX - s(50), centerY - s(15), centerX, centerY - s(15));
-    umbrellaCurvePath.quadraticBezierTo(centerX + s(50), centerY - s(15), centerX + s(60), centerY - s(25));
-    canvas.drawPath(umbrellaCurvePath, paint..color = Colors.white.withOpacity(0.5));
-    paint.color = Colors.white;
-
-    // Handle
-    final handleRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(centerX, centerY + s(15)), width: s(6), height: s(60)),
-      Radius.circular(s(3)),
+    // --- 1. HANDLE ---
+    // Vertical part
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(-3, -15, 6, 60),
+        const Radius.circular(3),
+      ),
+      whitePaint,
     );
-    canvas.drawRRect(handleRect, paint);
 
-    final handleCurvePath = Path();
-    handleCurvePath.moveTo(centerX, centerY + s(45));
-    handleCurvePath.quadraticBezierTo(centerX, centerY + s(52), centerX + s(8), centerY + s(55));
-    canvas.drawPath(handleCurvePath, strokePaint);
+    // Curved hook
+    Path handleCurve = Path();
+    handleCurve.moveTo(0, 45);
+    handleCurve.cubicTo(0, 52, 3, 55, 8, 55);
+    canvas.drawPath(handleCurve, strokePaint);
 
-    // === DROPS ===
-    _drawDrop(canvas, paint, centerX - s(33), centerY - s(115), centerY - s(60), drop1Progress, s);
-    _drawDrop(canvas, paint, centerX, centerY - s(115), centerY - s(60), drop2Progress, s);
-    _drawDrop(canvas, paint, centerX + s(27), centerY - s(115), centerY - s(60), drop3Progress, s);
+    // --- 2. RAIN DROPS (Behind Umbrella Top) ---
+    // Staggered drops
+    _drawDrop(canvas, offsetX: -33, startHeight: 30, cycleOffset: 0.0);
+    _drawDrop(canvas, offsetX: -3, startHeight: 35, cycleOffset: 0.33);
+    _drawDrop(canvas, offsetX: 27, startHeight: 30, cycleOffset: 0.66);
+
+    // --- 3. UMBRELLA TOP (Front) ---
+    // Triangle
+    Path umbrellaTop = Path();
+    umbrellaTop.moveTo(0, -60);
+    umbrellaTop.lineTo(-60, -25);
+    umbrellaTop.lineTo(0, -25);
+    umbrellaTop.lineTo(60, -25);
+    umbrellaTop.close();
+    canvas.drawPath(umbrellaTop, whitePaint);
+
+    // Bottom Curve
+    Path umbrellaBottomCurve = Path();
+    umbrellaBottomCurve.moveTo(-60, -25);
+    umbrellaBottomCurve.cubicTo(-60, -25, -50, -15, 0, -15);
+    umbrellaBottomCurve.cubicTo(50, -15, 60, -25, 60, -25);
+    canvas.drawPath(umbrellaBottomCurve, whiteOpacityPaint);
   }
 
-  void _drawDrop(Canvas canvas, Paint paint, double x, double startY, double endY, double progress, Function s) {
-    final y = startY + (endY - startY) * progress;
-    final opacity = progress < 0.9 ? 0.7 : (1.0 - progress) * 7;
-    if (opacity > 0) {
-      // Ensure opacity stays within bounds 0.0-1.0
-      final safeOpacity = opacity.clamp(0.0, 1.0);
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(x, y), width: s(6).toDouble(), height: (s(30) * (1 - progress * 0.3)).toDouble()),
-        Radius.circular(s(3).toDouble()),
+  void _drawDrop(Canvas canvas, {required double offsetX, required double startHeight, required double cycleOffset}) {
+    double progress = (animation.value + cycleOffset) % 1.0;
+
+    const double startY = -140.0;
+    const double surfaceY = -75.0; 
+    const double deepY = -40.0;    
+
+    double currentY;
+    double currentHeight;
+    double opacity;
+
+    if (progress < 0.6) {
+      // Falling
+      double t = progress / 0.6; 
+      currentY = _lerp(startY, surfaceY, t);
+      currentHeight = startHeight;
+      opacity = _lerp(0.0, 1.0, math.min(t * 4, 1.0)); 
+    } else {
+      // Hitting/Shrinking
+      double t = (progress - 0.6) / 0.4; 
+      currentY = _lerp(surfaceY, deepY, t);
+      currentHeight = _lerp(startHeight, 0, t);
+      opacity = t > 0.9 ? 0.0 : 1.0; 
+    }
+
+    if (opacity > 0 && currentHeight > 0) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(offsetX, currentY, 6, currentHeight),
+          const Radius.circular(3),
+        ),
+        Paint()..color = Colors.white.withOpacity(opacity * 0.7),
       );
-      canvas.drawRRect(rect, paint..color = Colors.white.withOpacity(safeOpacity));
     }
   }
 
+  double _lerp(double a, double b, double t) => a + (b - a) * t;
+
   @override
-  bool shouldRepaint(FlowCtrlLogoPainter oldDelegate) {
-    return oldDelegate.drop1Progress != drop1Progress ||
-        oldDelegate.drop2Progress != drop2Progress ||
-        oldDelegate.drop3Progress != drop3Progress;
-  }
+  bool shouldRepaint(covariant UmbrellaPainter oldDelegate) => true;
 }
