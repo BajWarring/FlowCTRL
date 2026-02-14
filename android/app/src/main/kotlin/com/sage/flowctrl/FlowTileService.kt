@@ -15,13 +15,9 @@ class FlowTileService : TileService() {
     override fun onClick() {
         super.onClick()
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        // Read current state
         val currentState = prefs.getBoolean("flutter.isBlockingEnabled", true)
-        // Toggle
         val newState = !currentState
         prefs.edit().putBoolean("flutter.isBlockingEnabled", newState).apply()
-        
-        // Update UI
         updateTileUi()
     }
 
@@ -30,16 +26,18 @@ class FlowTileService : TileService() {
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val isBlockingEnabled = prefs.getBoolean("flutter.isBlockingEnabled", true)
 
-        // ALWAYS use the same icon (ic_qs_logo)
+        // 1. ALWAYS use your custom logo for ALL states
         tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_logo)
 
         if (isBlockingEnabled) {
             tile.state = Tile.STATE_ACTIVE
-            tile.label = "FlowCTRL" // Simple label
+            tile.label = "FlowCTRL"
         } else {
             tile.state = Tile.STATE_INACTIVE
             tile.label = "FlowCTRL"
         }
+        
+        // Push the update
         tile.updateTile()
     }
 }
