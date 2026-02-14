@@ -2,18 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard_screen.dart';
+import 'splash_screen.dart'; // Import the new splash screen
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load saved theme preference before app starts
   final prefs = await SharedPreferences.getInstance();
   final isDark = prefs.getBool('isDarkMode') ?? false;
   
   runApp(FlowCTRLApp(initialDarkMode: isDark));
 }
 
-// A simple controller to handle theme changes globally
 class ThemeController extends ValueNotifier<bool> {
   ThemeController(super.value);
 
@@ -43,12 +42,10 @@ class _FlowCTRLAppState extends State<FlowCTRLApp> {
 
   @override
   Widget build(BuildContext context) {
-    // ValueListenableBuilder ensures the WHOLE app rebuilds smoothly when theme changes
     return ValueListenableBuilder<bool>(
       valueListenable: _themeController,
       builder: (context, isDark, child) {
         
-        // Update System UI Overlay (Status bar color) instantly
         SystemChrome.setSystemUIOverlayStyle(
           isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark
         );
@@ -62,8 +59,8 @@ class _FlowCTRLAppState extends State<FlowCTRLApp> {
             brightness: isDark ? Brightness.dark : Brightness.light,
             scaffoldBackgroundColor: isDark ? const Color(0xFF020617) : const Color(0xFFF9FAFB),
           ),
-          // Pass the controller down to the dashboard
-          home: DashboardScreen(themeController: _themeController),
+          // Changed 'home' to SplashScreen
+          home: SplashScreen(themeController: _themeController),
         );
       },
     );
