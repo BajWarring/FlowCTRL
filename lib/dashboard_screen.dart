@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_accessibility_service/flutter_accessibility_service.dart';
 import 'main.dart';
 import 'settings_page.dart';
+import 'permission_popup.dart'; // Import new popup
 
 class DashboardScreen extends StatefulWidget {
   final ThemeController themeController;
@@ -18,7 +19,12 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   bool _isServiceEnabled = false; 
-  bool _isBlockingEnabled = true; 
+  bool _isBlockingEnabled = true; // Master Switch
+  
+  // INDIVIDUAL APP STATES
+  bool _isYouTubeBlocked = true; 
+  bool _isInstagramBlocked = true;
+
   Timer? _monitorTimer;
   late AnimationController _spinController;
 
@@ -61,16 +67,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   Future<void> _checkPermissionNow() async {
-    // 1. Ask OS (Sometimes slow)
     bool osPermission = await FlutterAccessibilityService.isAccessibilityPermissionEnabled();
-    
-    // 2. Ask Storage (Fast & Reliable backup)
     final prefs = await SharedPreferences.getInstance();
-    
-    // FIX: Removed 'flutter.' prefix. The plugin adds it automatically.
-    // Now it correctly looks for "flutter.service_active" which Kotlin wrote.
     bool serviceRunning = prefs.getBool('service_active') ?? false;
-
     bool actuallyEnabled = osPermission || serviceRunning;
 
     if (actuallyEnabled != _isServiceEnabled) {
@@ -82,14 +81,30 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _isBlockingEnabled = prefs.getBool('isBlockingEnabled') ?? true;
+      _isYouTubeBlocked = prefs.getBool('isYouTubeBlocked') ?? true;
+      _isInstagramBlocked = prefs.getBool('isInstagramBlocked') ?? true;
     });
     _checkPermissionNow();
   }
 
-  Future<void> _toggleBlocking(bool newValue) async {
+  // --- TOGGLES ---
+
+  Future<void> _toggleMaster(bool newValue) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isBlockingEnabled', newValue);
     setState(() => _isBlockingEnabled = newValue);
+  }
+
+  Future<void> _toggleYouTube(bool newValue) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isYouTubeBlocked', newValue);
+    setState(() => _isYouTubeBlocked = newValue);
+  }
+
+  Future<void> _toggleInstagram(bool newValue) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isInstagramBlocked', newValue);
+    setState(() => _isInstagramBlocked = newValue);
   }
 
   // Helpers
@@ -120,7 +135,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               ),
             ],
           ),
-          if (!_isServiceEnabled) Positioned.fill(child: _buildPermissionOverlay()),
+          if (!_isServiceEnabled) 
+             Positioned.fill(
+               child: PermissionPopup(
+                 onDismiss: () => setState(() => _isServiceEnabled = true), // Manual override
+               ),
+             ),
         ],
       ),
     );
@@ -138,9 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             icon: Icon(Icons.settings, color: _isDark ? kGray400 : Colors.grey),
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => SettingsPage(themeController: widget.themeController),
-                ),
+                MaterialPageRoute(builder: (context) => SettingsPage(themeController: widget.themeController)),
               );
             }, 
           )
@@ -165,7 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           Text(_isBlockingEnabled ? "Distractions are blocked" : "Focus mode is currently off", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: _isBlockingEnabled ? kIndigo : _textColor)),
           const SizedBox(height: 40),
           GestureDetector(
-            onTap: () => _toggleBlocking(!_isBlockingEnabled),
+            onTap: () => _toggleMaster(!_isBlockingEnabled),
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -190,7 +208,29 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           const SizedBox(height: 16),
           Container(
             decoration: BoxDecoration(color: _cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: _isDark ? kSlate800 : Colors.grey.shade100), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0,2))]),
-            child: Column(children: [_buildAppItem(icon: Icons.play_arrow_rounded, iconColor: Colors.red, bgIconColor: Colors.red.withOpacity(0.1), name: "YouTube", desc: "Block shorts", isOn: _isBlockingEnabled, onToggle: (val) => _toggleBlocking(val)), Container(height: 1, color: _isDark ? kSlate800 : Colors.grey.shade50), _buildAppItem(icon: Icons.camera_alt_outlined, iconColor: Colors.pink, bgIconColor: Colors.pink.withOpacity(0.1), name: "Instagram", desc: "Block reels", isOn: false, onToggle: (val) {})]),
+            child: Column(children: [
+              // YOUTUBE
+              _buildAppItem(
+                icon: Icons.play_arrow_rounded, 
+                iconColor: Colors.red, 
+                bgIconColor: Colors.red.withOpacity(0.1), 
+                name: "YouTube", 
+                desc: "Block shorts", 
+                isOn: _isYouTubeBlocked, // Connected to state
+                onToggle: (val) => _toggleYouTube(val) // Connected to handler
+              ),
+              Container(height: 1, color: _isDark ? kSlate800 : Colors.grey.shade50),
+              // INSTAGRAM (FIXED)
+              _buildAppItem(
+                icon: Icons.camera_alt_outlined, 
+                iconColor: Colors.pink, 
+                bgIconColor: Colors.pink.withOpacity(0.1), 
+                name: "Instagram", 
+                desc: "Block reels", 
+                isOn: _isInstagramBlocked, // Connected to state
+                onToggle: (val) => _toggleInstagram(val) // Connected to handler
+              ),
+            ]),
           ),
         ],
       ),
@@ -199,12 +239,5 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   
   Widget _buildAppItem({required IconData icon, required Color iconColor, required Color bgIconColor, required String name, required String desc, required bool isOn, required Function(bool) onToggle}) {
     return Padding(padding: const EdgeInsets.all(16.0), child: Row(children: [Container(width: 48, height: 48, decoration: BoxDecoration(color: bgIconColor, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: iconColor, size: 24)), const SizedBox(width: 16), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(name, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: _textColor)), Text(desc, style: const TextStyle(fontSize: 12, color: Colors.grey))])), GestureDetector(onTap: () => onToggle(!isOn), child: AnimatedContainer(duration: const Duration(milliseconds: 300), width: 50, height: 28, decoration: BoxDecoration(color: isOn ? kIndigo : (_isDark ? kSlate800 : Colors.grey.shade300), borderRadius: BorderRadius.circular(20)), child: Stack(children: [AnimatedPositioned(duration: const Duration(milliseconds: 300), curve: Curves.easeOutBack, left: isOn ? 24 : 2, top: 2, child: Container(width: 24, height: 24, decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 2)]))) ]))) ]));
-  }
-
-  Widget _buildPermissionOverlay() {
-    return GestureDetector(
-      onTap: _checkPermissionNow, 
-      child: Container(color: Colors.black.withOpacity(0.8), child: Center(child: Container(margin: const EdgeInsets.symmetric(horizontal: 24), padding: const EdgeInsets.all(24), decoration: BoxDecoration(color: _isDark ? kSlate900 : Colors.white, borderRadius: BorderRadius.circular(24)), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.touch_app_rounded, size: 60, color: Color(0xFF4F46E5)), const SizedBox(height: 20), Text("Permission Required", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _textColor)), const SizedBox(height: 12), const Text("FlowCTRL needs Accessibility Service to detect when Shorts are playing.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 15)), const SizedBox(height: 24), SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () async { await FlutterAccessibilityService.requestAccessibilityPermission(); }, style: ElevatedButton.styleFrom(backgroundColor: kIndigo, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: const Text("Enable in Settings", style: TextStyle(fontWeight: FontWeight.bold)))), const SizedBox(height: 12), TextButton(onPressed: () { setState(() { _isServiceEnabled = true; }); }, child: const Text("I have enabled it (Skip Check)", style: TextStyle(color: Colors.grey)))])))),
-    );
   }
 }
