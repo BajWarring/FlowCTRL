@@ -21,12 +21,10 @@ class FlowAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         
-        // 1. Keep Service Active Flag
         if (!prefs.getBoolean("flutter.service_active", false)) {
             prefs.edit().putBoolean("flutter.service_active", true).apply()
         }
 
-        // 2. GLOBAL MASTER SWITCH (The Big Button)
         if (!prefs.getBoolean("flutter.isBlockingEnabled", true)) return
 
         if (event == null || event.packageName == null) return
@@ -38,9 +36,8 @@ class FlowAccessibilityService : AccessibilityService() {
 
         val rootNode = rootInActiveWindow ?: return
 
-        // 3. YOUTUBE LOGIC
+        // YOUTUBE
         if (packageName == "com.google.android.youtube") {
-            // Check individual YouTube Toggle (Default to true)
             if (prefs.getBoolean("flutter.isYouTubeBlocked", true)) {
                 if (detectYouTubeShorts(rootNode)) {
                     performGlobalAction(GLOBAL_ACTION_BACK)
@@ -48,9 +45,8 @@ class FlowAccessibilityService : AccessibilityService() {
                 }
             }
         } 
-        // 4. INSTAGRAM LOGIC
+        // INSTAGRAM
         else if (packageName == "com.instagram.android") {
-            // Check individual Instagram Toggle (Default to true)
             if (prefs.getBoolean("flutter.isInstagramBlocked", true)) {
                 if (detectInstagramReels(rootNode)) {
                     performGlobalAction(GLOBAL_ACTION_BACK)
@@ -60,11 +56,11 @@ class FlowAccessibilityService : AccessibilityService() {
         }
     }
 
-    // --- DETECTION LOGIC (Same as before) ---
     private fun detectYouTubeShorts(root: AccessibilityNodeInfo): Boolean {
         if (hasId(root, "com.google.android.youtube:id/reel_recycler")) return true
         if (hasId(root, "com.google.android.youtube:id/reel_player_view")) return true
         if (hasId(root, "com.google.android.youtube:id/reel_touch_helper_0")) return true
+        
         val shortsText = root.findAccessibilityNodeInfosByText("Shorts")
         if (shortsText != null && !shortsText.isEmpty()) {
             if (hasText(root, "Like") || hasText(root, "Dislike") || hasText(root, "Comment")) return true
@@ -73,15 +69,25 @@ class FlowAccessibilityService : AccessibilityService() {
     }
 
     private fun detectInstagramReels(root: AccessibilityNodeInfo): Boolean {
+        // 1. Check for specific IDs
         if (hasId(root, "com.instagram.android:id/clips_video_container")) return true
         if (hasId(root, "com.instagram.android:id/clips_viewer_root")) return true
         if (hasId(root, "com.instagram.android:id/reel_viewer_root")) return true
-        if (hasId(root, "com.instagram.android:id/reels_tab_toolbar_container")) return true
-        val reelsDesc = root.findAccessibilityNodeInfosByText("Reel by")
-        if (reelsDesc != null && !reelsDesc.isEmpty()) {
-            if (hasId(root, "com.instagram.android:id/row_feed_button_like") || 
-                hasId(root, "com.instagram.android:id/row_feed_button_comment")) return true
+
+        // 2. Check for "Reels" Tab being selected
+        // This is often a frame layout with description "Reels, tab" or similar
+        val reelsTab = root.findAccessibilityNodeInfosByText("Reels")
+        if (reelsTab != null) {
+            for (node in reelsTab) {
+                if (node.isSelected) return true // You are ON the Reels tab
+            }
         }
+
+        // 3. Check for specific Content Descriptions inside the viewer
+        // "Reel by [user]" is a common description
+        val reelsBy = root.findAccessibilityNodeInfosByText("Reel by")
+        if (reelsBy != null && !reelsBy.isEmpty()) return true
+
         return false
     }
 
